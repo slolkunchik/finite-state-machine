@@ -5,11 +5,12 @@ class FSM {
      */
 
     constructor(config) {
-      this.config = config;
-      if(this.config === undefined){
-          throw new Error("Config isn't passed");
-      }
-      this.history = [this.config.initial];
+        this.config = config;
+        if (this.config === undefined) {
+            throw new Error("Config isn't passed");
+        }
+        this.history = [this.config.initial];
+        this.undoList = [];
     }
 
     /**
@@ -17,7 +18,7 @@ class FSM {
      * @returns {String}
      */
     getState() {
-        if(this.state === undefined) {
+        if (this.state === undefined) {
             this.state = this.config.initial;
         }
 
@@ -29,13 +30,12 @@ class FSM {
      * @param state
      */
     changeState(state) {
-        if(this.config.states[state] === undefined){
+        if (this.config.states[state] === undefined) {
             throw new Error("State isn't exist");
         } else {
-            //this.prevState = this.state||this.config.initial;
             this.state = state;
             this.history.push(this.state);
-            this.i = this.history.length - 1;
+
             return this.state;
         }
 
@@ -46,22 +46,15 @@ class FSM {
      * @param event
      */
     trigger(event) {
-        let curState = this.state||this.config.initial; //в зависимости от того менялось ли initial state
-        console.log('curstate', curState);
+        let curState = this.state || this.config.initial; //depending on the initial state (changed or not)
         let newState = this.config.states[curState].transitions[event];
-        console.log(newState);
-        if(!newState) { //если вернулось undefined
+
+        if (!newState) { //if undefined
             throw new Error("Event in current state isn\'t exist");
         } else {
-            console.log(this.history);
-            this.history.push(newState);
-            console.log(this.history);
-            this.state = newState;
-            this.i = this.history.length - 1;
-            console.log('i', this.i);
+            this.undoList = []; //for redo
+            this.changeState(newState)
         }
-        //this.prevState = curState;
-        //this.history.push(this.prevState);
 
         return this;
     }
@@ -83,14 +76,14 @@ class FSM {
     getStates(event) {
         let statesArray = [];
         let states = this.config.states;
-        if(event === undefined) {
+        if (event === undefined) {
             return Object.keys(states);
         } else {
-           for(let key in states) {
-               if(states[key].transitions[event]) {
-                   statesArray.push(key);
-               }
-           }
+            for (let key in states) {
+                if (states[key].transitions[event]) {
+                    statesArray.push(key);
+                }
+            }
         }
         return statesArray;
     }
@@ -101,20 +94,13 @@ class FSM {
      * @returns {Boolean}
      */
     undo() {
-        if(this.history.length === 1) {
-            return false;
-        }
-        if(this.history[this.history.length-2] === this.state) {
-            return false;
-        }
-        else {
-            this.i = this.history.length-1; // индекс последнего элемента в хистори;
-            //this.state = this.prevState; // state стал предпоследним, т.е. индекс -1;
-            this.i--;
-            this.state = this.history[this.i];
-            return true;
+        if (this.history.slice(-1)[0] === this.config.initial) {
+            return false
         }
 
+        this.undoList.push(this.history.pop()); //delete and push last history element
+        this.changeState(this.history.slice(-1)[0]);
+        return true;
     }
 
     /**
@@ -123,16 +109,10 @@ class FSM {
      * @returns {Boolean}
      */
     redo() {
-        if(this.history.length === 1) {
+        if (this.undoList.length === 0) {
             return false;
         }
-
-        if((this.i+1) >= this.history.length) { //чтобы не ушло дальше, чем вся хистори
-            return false;
-        }
-        this.i++;
-        this.state = this.history[this.i];
-            //this.prevState = this.history[this.i-1];
+        this.changeState(this.undoList.pop());
         return true;
     }
 
